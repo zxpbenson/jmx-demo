@@ -1,0 +1,55 @@
+package com.benson.note.jmx.demo;
+
+import javax.management.Attribute;
+import javax.management.MBeanServerConnection;
+import javax.management.MBeanServerInvocationHandler;
+import javax.management.ObjectName;
+import javax.management.remote.JMXConnector;
+import javax.management.remote.JMXConnectorFactory;
+import javax.management.remote.JMXServiceURL;
+import java.io.IOException;
+import java.util.List;
+
+public class JMXClientApp {
+
+    public static void main(String[] args) throws IOException, Exception, NullPointerException {
+        String ip = "127.0.0.1";
+        if (args != null && args.length > 0) {
+            ip = args[0];
+        }
+        String jmxServiceUrl = "service:jmx:rmi:///jndi/rmi://" + ip + ":9999/jmxrmi";
+        System.out.println("jmxServiceUrl : " + jmxServiceUrl);
+        JMXServiceURL url = new JMXServiceURL(jmxServiceUrl);
+        JMXConnector jmxc = JMXConnectorFactory.connect(url, null);
+        MBeanServerConnection mbsc = jmxc.getMBeanServerConnection();
+        //ObjectName的名称与前面注册时候的保持一致
+        ObjectName mbeanName = new ObjectName(HelloAgent.HELLO_MBEAN_NAME);
+        System.out.println("Domains ......");
+        String[] domains = mbsc.getDomains();
+        for (int i = 0; i < domains.length; i++) {
+            System.out.println("doumain[" + i + "]=" + domains[i]);
+        }
+        System.out.println("MBean count = " + mbsc.getMBeanCount());
+        //设置指定Mbean的特定属性值
+        //这里的setAttribute、getAttribute操作只能针对bean的属性
+        //例如对getName或者setName进行操作，只能使用Name，需要去除方法的前缀
+        mbsc.setAttribute(mbeanName, new Attribute("Name", "杭州"));
+        mbsc.setAttribute(mbeanName, new Attribute("Age", "1990"));
+        String age = (String) mbsc.getAttribute(mbeanName, "Age");
+        String name = (String) mbsc.getAttribute(mbeanName, "Name");
+        System.out.println("age=" + age + ";name=" + name);
+
+        HelloMBean proxy = MBeanServerInvocationHandler.newProxyInstance(mbsc, mbeanName, HelloMBean.class, false);
+        proxy.helloWorld();
+        List<Msg> ret = proxy.helloWorld("migu");
+        for(Msg msg : ret){
+            System.out.println("history hello ret : " + msg.getLog());
+        }
+        proxy.getTelephone();
+        //invoke调用bean的方法，只针对非设置属性的方法
+        //例如invoke不能对getName方法进行调用
+        mbsc.invoke(mbeanName, "getTelephone", null, null);
+        mbsc.invoke(mbeanName, "helloWorld", new String[]{"I'll connect to JMX Server via client2"}, new String[]{"java.lang.String"});
+        mbsc.invoke(mbeanName, "helloWorld", null, null);
+    }
+}
